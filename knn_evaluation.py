@@ -111,7 +111,7 @@ def cross_validation(embeddings, syndrome_ids, metric='cosine', n_neighbors=5, n
     return np.mean(auc_scores)
 
 def plot_roc_auc(embeddings, syndrome_ids, n_splits=10, output_path='roc_auc_plot.png'):
-    """Saves the ROC AUC plots for cosine and euclidean metrics.
+    """Saves the ROC AUC plots for cosine and euclidean metrics, averaged across all folds.
 
     Args:
       embeddings: Image embeddings.
@@ -120,6 +120,9 @@ def plot_roc_auc(embeddings, syndrome_ids, n_splits=10, output_path='roc_auc_plo
       n_splits: Number of folds for cross-validation.
     """
     kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
+    
+    tprs_cosine, tprs_euclidean = [], []
+    mean_fpr = np.linspace(0, 1, 100)
     cosine_auc_values = []
     euclidean_auc_values = []
 
@@ -133,24 +136,39 @@ def plot_roc_auc(embeddings, syndrome_ids, n_splits=10, output_path='roc_auc_plo
         cosine_knn_preds = knn_classification(train_embeddings, train_labels, test_embeddings, metric='cosine')
         fpr_cos, tpr_cos, _ = roc_curve(test_labels, cosine_knn_preds[:, 1], pos_label=1)
         cosine_auc_values.append(auc(fpr_cos, tpr_cos))
-        plt.plot(fpr_cos, tpr_cos, label=f'Cosine Fold {len(cosine_auc_values)} (AUC={auc(fpr_cos, tpr_cos):.2f})')
-        print(f'Cosine Fold {len(cosine_auc_values)} (AUC={auc(fpr_cos, tpr_cos):.2f})')
+        tprs_cosine.append(np.interp(mean_fpr, fpr_cos, tpr_cos))  # Interpolate TPR for the common FPR scale
+        tprs_cosine[-1][0] = 0.0
 
         # Euclidean ROC AUC
         euclidean_knn_preds = knn_classification(train_embeddings, train_labels, test_embeddings, metric='euclidean')
         fpr_euc, tpr_euc, _ = roc_curve(test_labels, euclidean_knn_preds[:, 1], pos_label=1)
         euclidean_auc_values.append(auc(fpr_euc, tpr_euc))
-        plt.plot(fpr_euc, tpr_euc, label=f'Euclidean Fold {len(euclidean_auc_values)} (AUC={auc(fpr_euc, tpr_euc):.2f})')
-        print(f'Euclidean Fold {len(euclidean_auc_values)} (AUC={auc(fpr_euc, tpr_euc):.2f})')
-        
-    plt.title('ROC AUC Comparison - Cosine vs Euclidean')
+        tprs_euclidean.append(np.interp(mean_fpr, fpr_euc, tpr_euc))
+        tprs_euclidean[-1][0] = 0.0
+
+    # Compute the mean TPR for each algorithm
+    mean_tpr_cosine = np.mean(tprs_cosine, axis=0)
+    mean_tpr_cosine[-1] = 1.0  # Ensure TPR ends at 1
+    mean_auc_cosine = auc(mean_fpr, mean_tpr_cosine)
+
+    mean_tpr_euclidean = np.mean(tprs_euclidean, axis=0)
+    mean_tpr_euclidean[-1] = 1.0
+    mean_auc_euclidean = auc(mean_fpr, mean_tpr_euclidean)
+
+    # Plot the averaged ROC AUC curves
+    plt.plot(mean_fpr, mean_tpr_cosine, color='blue', label=f'Cosine (Mean AUC = {mean_auc_cosine:.2f})')
+    plt.plot(mean_fpr, mean_tpr_euclidean, color='green', label=f'Euclidean (Mean AUC = {mean_auc_euclidean:.2f})')
+
+    plt.title('ROC AUC Comparison - Cosine vs Euclidean (Averaged)')
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
     plt.legend()
+    plt.grid(True)
     plt.savefig(output_path)
-    print(f'ROC AUC plot save as {output_path}')
+    print(f'ROC AUC plot saved as {output_path}')
 
-# Função principal
+    return cosine_auc_values, euclidean_auc_values
+
 if __name__ == '__main__':
     data = load_data('mini_gm_public_v0.1.p')
     embeddings, encoded_syndrome_ids, le = prepare_data(data)
@@ -161,4 +179,20 @@ if __name__ == '__main__':
     print(f'Mean AUC for Cosine Distance: {cosine_auc}')
     print(f'Mean AUC for Euclidean Distance: {euclidean_auc}')
 
-    plot_roc_auc(embeddings, encoded_syndrome_ids)
+    cosine_auc_values, euclidean_auc_values = plot_roc_auc(embeddings, encoded_syndrome_ids)
+
+    # Write to a text file
+    with open('performance_comparison.txt', 'w') as f:
+        f.write('Performance Comparison\n')
+        f.write('----------------------\n')
+        f.write('\nCosine Distance\n')
+        f.write('Fold\tAUC\n')
+        for i, score in enumerate(cosine_auc_values, start=1):
+            f.write(f'Fold {i}\t{score:.2f}\n')
+        f.write(f'\nAverage AUC: {cosine_auc:.2f}\n')
+        
+        f.write('\nEuclidean Distance\n')
+        f.write('Fold\tAUC\n')
+        for i, score in enumerate(euclidean_auc_values, start=1):
+            f.write(f'Fold {i}\t{score:.2f}\n')
+        f.write(f'\nAverage AUC: {euclidean_auc:.2f}\n')
