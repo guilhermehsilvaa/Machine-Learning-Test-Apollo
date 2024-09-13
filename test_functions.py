@@ -2,10 +2,8 @@ import pytest
 import pickle
 import numpy as np
 from sklearn.preprocessing import LabelEncoder
-from sklearn.preprocessing import StandardScaler
 from knn_evaluation import load_data, prepare_data
 
-# Criando dados fictícios para teste de carga de dados
 @pytest.fixture
 def mock_data():
     """Creates mock data for testing.
