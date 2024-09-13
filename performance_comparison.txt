@@ -1,0 +1,32 @@
+Performance Comparison
+----------------------
+
+Cosine Distance
+Fold	AUC
+Fold 1	0.92
+Fold 2	0.81
+Fold 3	0.95
+Fold 4	0.94
+Fold 5	0.97
+Fold 6	0.97
+Fold 7	0.91
+Fold 8	0.90
+Fold 9	0.91
+Fold 10	1.00
+
+Average AUC: 0.93
+
+Euclidean Distance
+Fold	AUC
+Fold 1	0.93
+Fold 2	0.96
+Fold 3	0.92
+Fold 4	0.89
+Fold 5	0.91
+Fold 6	0.84
+Fold 7	0.86
+Fold 8	0.84
+Fold 9	0.90
+Fold 10	0.99
+
+Average AUC: 0.91
